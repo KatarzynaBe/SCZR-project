@@ -23,6 +23,7 @@ std::string textFromSharedMemory() {
 }
 
 std::string textFromMessageQueue() {
+
     const int kBufferSize = 64;
     char buffer[kBufferSize];
     mqd_t descriptor = mq_open("/test_queue", O_RDONLY);

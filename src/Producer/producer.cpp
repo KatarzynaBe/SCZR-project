@@ -5,6 +5,9 @@
 #include <unistd.h>
 #include <cstring>
 #include <mqueue.h>
+#include <iostream>
+#include "../Consumer/consumer.h"
+
 
 void sendViaSharedMemory(const std::string &message) {
 //    Open shared memory
@@ -24,12 +27,13 @@ void sendViaSharedMemory(const std::string &message) {
 }
 
 void sendViaMessageQueue(const std::string &message) {
+    mq_unlink("/test_queue");
     struct mq_attr queue_attributes;
     queue_attributes.mq_flags = 0;
     queue_attributes.mq_maxmsg = 10;
     queue_attributes.mq_msgsize = message.length() + 1;
     queue_attributes.mq_curmsgs = 0;
-    mqd_t descriptor = mq_open("/test_queue", O_CREAT | O_RDWR, 0644, &queue_attributes);
+    mqd_t descriptor = mq_open("/test_queue",   O_RDWR | O_CREAT,  0777, &queue_attributes);
     if (descriptor == -1) {
         exitWithError("Producer cannot open message queue");
     }
@@ -38,6 +42,7 @@ void sendViaMessageQueue(const std::string &message) {
     if (send_result == -1) {
         exitWithError("Producer cannot send the data");
     }
+
     sleep(10); // Wait until consumer starts using the message queue
     mq_unlink("/test_queue");
 }

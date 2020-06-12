@@ -10,7 +10,10 @@
 #include <ctime>
 
 
+
+
 const char *kDbFileName = "testDb.db";
+std::string max_data;
 // Country and population
 const std::string kDbData = "China,1439323776\n"
                             "India,1380004385\n"
@@ -74,7 +77,7 @@ void execStatement(sqlite3 *openedDb, const char *statement) {
 /**
  * @return Opened database with the name provided in kDbFileName
  */
-sqlite3 *openedDb() {
+sqlite3 * openedDb() {
     sqlite3 *outDb;
     int rc = sqlite3_open(kDbFileName, &outDb);
     if (rc != SQLITE_OK) {
@@ -82,6 +85,8 @@ sqlite3 *openedDb() {
     }
     return outDb;
 }
+
+
 
 /**
  * Insert database rows with a random number of infected people
@@ -145,6 +150,12 @@ void generateRandomlyFilledTable() {
     sqlite3_close(openedDatabase);
 }
 
+int callback2(void *NotUsed, int argc, char **argv, char **azColName){
+
+        max_data=argv[0];
+
+    return 0;
+}
 std::string generatestring()
 {
     std::stringstream in_stream(kDbData);
@@ -155,14 +166,20 @@ std::string generatestring()
     long default_infected_number;
     srand( time( NULL ) );
     unsigned long commaPos;
-
+    char *zErrMsg =0;
+    sqlite3 *db;
+    int rc = sqlite3_open("testDb.db", &db);
+    const char *sql_select = "SELECT ifnull(date(max(Date) ,'+1 day'), date('now'))from 'COVID-statistic';";
+    rc=sqlite3_exec(db, sql_select, callback2, 0, &zErrMsg);
     while (std::getline(in_stream, line)) {
         commaPos = line.find(',');
         country = line.substr(0, commaPos);
         default_infected_number = std::stol(line.substr(commaPos + 1)); // start after comma position
-        out_string=(out_string+country + ", "+ std::to_string(rand()%1000) + ", "+ "2020.01.01\n");
+        //out_string=(out_string+country + ", "+ std::to_string(rand()%1000) + ", "+ "2020.01.01\n");
+       out_string=(out_string+country + ", "+ std::to_string(rand()%1000) + ", "+ max_data+'\n');
 
     }
+    sqlite3_close(db);
  return out_string;
 
 }
@@ -177,16 +194,22 @@ void insertData(sqlite3 *openedDb) {
                   "VALUES ";
     // First line
     std::getline(in_stream, line);
+    int year, month, day;
+    year = std::stoi(max_data.substr(0, 4));
+    month = std::stoi(max_data.substr(5, 2));
+    day = std::stoi(max_data.substr(8, 2));
     unsigned long commaPos = line.find(',');
     std::string country = line.substr(0, commaPos);
     long default_infected_number = std::stol(line.substr(commaPos + 1)); // start after comma position
-    out_stream << "(" << DbRow(country, default_infected_number, Date(2021, 6, 4)) << ")";
+    //out_stream << "(" << DbRow(country, default_infected_number, Date(2021, 6, 4)) << ")";
+    out_stream << "(" << DbRow(country, default_infected_number, Date(year, month, day)) << ")";
     // Other lines
+
     while (std::getline(in_stream, line)) {
         commaPos = line.find(',');
         country = line.substr(0, commaPos);
         default_infected_number = std::stol(line.substr(commaPos + 1)); // start after comma position
-        out_stream << ",\n(" << DbRow(country, default_infected_number, Date(2021, 6, 4)) << ")";
+        out_stream << ",\n(" << DbRow(country, default_infected_number, Date(year, month, day))<< ")";
     }
     out_stream << ";";
     execStatement(openedDb, out_stream.str().c_str());
@@ -196,7 +219,45 @@ void insertData(sqlite3 *openedDb) {
 void getData() {
     sqlite3 *openedDatabase = openedDb();
     createTableIfNotExists(openedDatabase);
-    clearTable(openedDatabase);
+   // clearTable(openedDatabase);
     insertData(openedDatabase);
     sqlite3_close(openedDatabase);
 }
+
+
+
+int callback(void *NotUsed, int argc, char **argv, char **azColName){
+    std::ofstream file;
+    file.open("results.txt", std::ios::app);
+  //  file << "REPORT"<<'\n'<<"Country"<<'\t'<<'\t'<<"Infected_Numer"<<'\t'<<'\t'<<"Date"<<'\n';
+    for(int i = 0; i < argc; i++) {
+        std::cout << azColName[i] << ": " << argv[i] << std::endl;
+        file  << argv[i] <<'\t'<<'\t'<<'\t';
+    }
+    file <<std::endl;
+    std::cout << std::endl;
+    file.close();
+    return 0;
+}
+
+
+
+
+void create_results()
+{
+
+    sqlite3 *db;
+    int rc = sqlite3_open("testDb.db", &db);
+    std::string sql_select = "SELECT country, InfectedNumer, Date from 'COVID-statistic' where rowid=1 order by Date desc, InfectedNumer desc;";
+    char *zErrMsg =0;
+    rc = sqlite3_exec(db, sql_select.c_str(),callback, 0, &zErrMsg );
+    sqlite3_close(db);
+
+}
+
+
+
+
+
+
+
